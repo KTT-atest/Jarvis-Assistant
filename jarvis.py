@@ -107,21 +107,47 @@ def get_system_context():
         return f"System context unavailable: {e}"
 
 
+piper_proc = None
+
+def init_piper():
+    global piper_proc
+    print("Loading Piper voice model...")
+    piper_proc = subprocess.Popen(
+        ['piper', '--model', PIPER_MODEL, '--length-scale', '0.85',
+         '--output-raw', '--quiet'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL
+    )
+    print("Piper ready.")
+
 def speak(text):
-    global is_speaking
+    global is_speaking, piper_proc
     is_speaking = True
     print(f"JARVIS: {text}")
-    text = text.replace('"', '').replace("'", '').replace('`', '')
-    tmp = "/tmp/jarvis_tts.wav"
-    subprocess.run(
-        f'echo "{text}" | piper --model {PIPER_MODEL} --output_file {tmp}',
-        shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    text = text.replace('"', '').replace("'", '').replace('`', '').strip()
     q.queue.clear()
-    subprocess.run(
-        f'aplay {tmp}',
-        shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    try:
+        piper_proc.stdin.write((text + '\n').encode())
+        piper_proc.stdin.flush()
+        aplay = subprocess.Popen(
+            ['aplay', '-r', '22050', '-f', 'S16_LE', '-t', 'raw', '-q', '-'],
+            stdin=subprocess.PIPE
+        )
+        import time
+        start = time.time()
+        while True:
+            chunk = piper_proc.stdout.read(4096)
+            if not chunk:
+                break
+            aplay.stdin.write(chunk)
+            if time.time() - start > 15:
+                break
+        aplay.stdin.close()
+        aplay.wait()
+    except Exception as e:
+        print(f"Speak error: {e}")
+        init_piper()
     q.queue.clear()
     is_speaking = False
 
@@ -252,7 +278,7 @@ def callback(indata, frames, time, status):
     if not is_speaking:
         q.put(bytes(indata))
 
-
+init_piper()
 print("J.A.R.V.I.S. online.")
 speak("All systems online. How can I assist you, sir?")
 
