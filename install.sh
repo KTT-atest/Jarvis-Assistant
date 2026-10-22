@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# ─────────────────────────────────────────
-#  J.A.R.V.I.S. Installer for Fedora KDE
-# ─────────────────────────────────────────
+# ─────────────────────────────────────────────────────
+#  J.A.R.V.I.S. Universal Linux Installer
+#  Supports: Fedora, Ubuntu/Debian, Arch, openSUSE
+# ─────────────────────────────────────────────────────
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -21,8 +22,8 @@ print_banner() {
     echo "╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║"
     echo " ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝"
     echo -e "${NC}"
-    echo -e "${BOLD}  Voice Assistant Installer for Fedora KDE${NC}"
-    echo -e "  ${BLUE}────────────────────────────────────────${NC}"
+    echo -e "${BOLD}  Universal Linux Voice Assistant Installer${NC}"
+    echo -e "  ${BLUE}──────────────────────────────────────────${NC}"
     echo ""
 }
 
@@ -30,47 +31,108 @@ ok()   { echo -e "  ${GREEN}✔${NC} $1"; }
 info() { echo -e "  ${BLUE}→${NC} $1"; }
 warn() { echo -e "  ${YELLOW}⚠${NC} $1"; }
 fail() { echo -e "  ${RED}✘${NC} $1"; exit 1; }
-
-ask() {
-    echo -e "  ${YELLOW}?${NC} $1"
-    read -r "$2"
-}
+ask()  { echo -e "  ${YELLOW}?${NC} $1"; read -r "$2"; }
 
 print_banner
 
-# ── Check Fedora ──────────────────────────────────────────────────────────────
-if ! command -v dnf &>/dev/null; then
-    fail "This installer is for Fedora Linux only."
-fi
-ok "Fedora detected."
+# ── Detect distro ─────────────────────────────────────────────────────────────
+detect_distro() {
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        DISTRO_ID="${ID,,}"
+        DISTRO_LIKE="${ID_LIKE,,}"
+    else
+        fail "Cannot detect Linux distribution."
+    fi
 
-# ── Ask for Gemini API key ────────────────────────────────────────────────────
+    if [[ "$DISTRO_ID" == "fedora" || "$DISTRO_LIKE" == *"fedora"* || "$DISTRO_LIKE" == *"rhel"* ]]; then
+        DISTRO="fedora"
+        PKG_MANAGER="dnf"
+        INSTALL_CMD="sudo dnf install -y"
+        PKGS="python3 python3-pip portaudio-devel espeak-ng wget unzip curl"
+    elif [[ "$DISTRO_ID" == "ubuntu" || "$DISTRO_ID" == "debian" || "$DISTRO_LIKE" == *"debian"* || "$DISTRO_LIKE" == *"ubuntu"* ]]; then
+        DISTRO="debian"
+        PKG_MANAGER="apt"
+        INSTALL_CMD="sudo apt install -y"
+        PKGS="python3 python3-pip portaudio19-dev espeak-ng wget unzip curl"
+    elif [[ "$DISTRO_ID" == "arch" || "$DISTRO_LIKE" == *"arch"* ]]; then
+        DISTRO="arch"
+        PKG_MANAGER="pacman"
+        INSTALL_CMD="sudo pacman -S --noconfirm"
+        PKGS="python python-pip portaudio espeak-ng wget unzip curl"
+    elif [[ "$DISTRO_ID" == "opensuse"* || "$DISTRO_LIKE" == *"suse"* ]]; then
+        DISTRO="opensuse"
+        PKG_MANAGER="zypper"
+        INSTALL_CMD="sudo zypper install -y"
+        PKGS="python3 python3-pip portaudio-devel espeak-ng wget unzip curl"
+    else
+        warn "Distro '$DISTRO_ID' not officially supported."
+        warn "Will attempt to continue — you may need to install dependencies manually."
+        DISTRO="unknown"
+        PKG_MANAGER="unknown"
+        INSTALL_CMD=""
+        PKGS=""
+    fi
+
+    ok "Detected: $PRETTY_NAME"
+}
+
+detect_distro
+
+# ── Check sudo ────────────────────────────────────────────────────────────────
+if ! sudo -v &>/dev/null; then
+    fail "This installer requires sudo privileges."
+fi
+
+# ── Gemini API key ────────────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Step 1 — Gemini API Key${NC}"
 echo -e "  Get a free key at: ${CYAN}https://aistudio.google.com/app/apikey${NC}"
 echo ""
-ask "Paste your Gemini API key:" GEMINI_KEY
+ask "Paste your Gemini API key (or press Enter to skip):" GEMINI_KEY
 if [[ -z "$GEMINI_KEY" ]]; then
-    warn "No key entered. You can add it later in ~/jarvis.py"
+    warn "No key entered. Add it later in ~/jarvis.py"
     GEMINI_KEY="YOUR_KEY_HERE"
 fi
 
 # ── System dependencies ───────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Step 2 — Installing system dependencies${NC}"
-info "Running dnf install..."
-sudo dnf install -y python3 python3-pip portaudio-devel espeak-ng wget unzip curl \
-    &>/dev/null && ok "System packages installed." || fail "dnf install failed."
+
+if [[ "$DISTRO" == "debian" ]]; then
+    sudo apt update -q &>/dev/null
+fi
+
+if [[ -n "$INSTALL_CMD" ]]; then
+    info "Installing packages via $PKG_MANAGER..."
+    $INSTALL_CMD $PKGS &>/dev/null \
+        && ok "System packages installed." \
+        || warn "Some packages may have failed — continuing anyway."
+else
+    warn "Unknown distro — skipping system packages. Install manually: python3 pip portaudio espeak-ng wget unzip curl"
+fi
 
 # ── Python packages ───────────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Step 3 — Installing Python packages${NC}"
-pip install vosk sounddevice requests piper-tts --break-system-packages -q \
-    && ok "Python packages installed." || fail "pip install failed."
+info "Installing vosk, sounddevice, requests, piper-tts..."
+
+# Try with --break-system-packages first (needed on newer distros)
+if pip install vosk sounddevice requests piper-tts \
+    --break-system-packages -q 2>/dev/null; then
+    ok "Python packages installed."
+elif pip3 install vosk sounddevice requests piper-tts \
+    --break-system-packages -q 2>/dev/null; then
+    ok "Python packages installed via pip3."
+elif python3 -m pip install vosk sounddevice requests piper-tts -q 2>/dev/null; then
+    ok "Python packages installed via python3 -m pip."
+else
+    fail "Could not install Python packages. Try manually: pip install vosk sounddevice requests piper-tts"
+fi
 
 # ── Vosk model ────────────────────────────────────────────────────────────────
 echo ""
-echo -e "  ${BOLD}Step 4 — Downloading Vosk speech recognition model${NC}"
+echo -e "  ${BOLD}Step 4 — Vosk speech recognition model${NC}"
 echo ""
 echo -e "  ${YELLOW}Choose model size:${NC}"
 echo "    1) Small  (~40 MB)  — faster, less accurate"
@@ -84,7 +146,7 @@ cd ~/vosk-model
 if [[ "$MODEL_CHOICE" == "2" ]]; then
     MODEL_NAME="vosk-model-en-us-0.22"
     MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip"
-    info "Downloading large model (~1.8 GB) — this will take a while..."
+    info "Downloading large model (~1.8 GB)..."
 else
     MODEL_NAME="vosk-model-small-en-us-0.15"
     MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
@@ -103,7 +165,7 @@ fi
 
 # ── Piper JARVIS voice ────────────────────────────────────────────────────────
 echo ""
-echo -e "  ${BOLD}Step 5 — Downloading JARVIS voice model${NC}"
+echo -e "  ${BOLD}Step 5 — JARVIS voice model${NC}"
 echo ""
 echo -e "  ${YELLOW}Choose voice quality:${NC}"
 echo "    1) Medium (~64 MB)  — good quality"
@@ -139,26 +201,31 @@ echo -e "  ${BOLD}Step 6 — Installing JARVIS${NC}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! -f "$SCRIPT_DIR/jarvis.py" ]]; then
-    fail "jarvis.py not found in $SCRIPT_DIR — make sure install.sh is in the same folder as jarvis.py"
+    fail "jarvis.py not found in $SCRIPT_DIR — make sure install.sh is in the same folder."
 fi
 
 cp "$SCRIPT_DIR/jarvis.py" ~/jarvis.py
-
-# Inject API key and model paths
 sed -i "s|YOUR_KEY_HERE|$GEMINI_KEY|g" ~/jarvis.py
 sed -i "s|vosk-model-small-en-us-0.15|$MODEL_NAME|g" ~/jarvis.py
 sed -i "s|jarvis-high.onnx|$VOICE_FILE|g" ~/jarvis.py
-
-ok "jarvis.py installed to ~/jarvis.py"
+ok "jarvis.py configured and installed to ~/jarvis.py"
 
 # ── Autostart ─────────────────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Step 7 — Autostart on login${NC}"
-ask "Start JARVIS automatically on login? [y/N]:" AUTOSTART
+echo ""
+echo -e "  ${YELLOW}Choose autostart method:${NC}"
+echo "    1) KDE autostart     (KDE Plasma)"
+echo "    2) GNOME autostart   (GNOME / Ubuntu)"
+echo "    3) systemd service   (any desktop, most reliable)"
+echo "    4) Skip"
+echo ""
+ask "Enter choice [1/2/3/4]:" AUTOSTART_CHOICE
 
-if [[ "$AUTOSTART" =~ ^[Yy]$ ]]; then
-    mkdir -p ~/.config/autostart
-    cat > ~/.config/autostart/jarvis.desktop << DESKTOP
+case "$AUTOSTART_CHOICE" in
+    1)
+        mkdir -p ~/.config/autostart
+        cat > ~/.config/autostart/jarvis.desktop << DESKTOP
 [Desktop Entry]
 Type=Application
 Name=JARVIS
@@ -168,19 +235,70 @@ Icon=utilities-terminal
 Terminal=false
 X-KDE-AutostartEnabled=true
 DESKTOP
-    ok "Autostart configured."
+        ok "KDE autostart configured."
+        ;;
+    2)
+        mkdir -p ~/.config/autostart
+        cat > ~/.config/autostart/jarvis.desktop << DESKTOP
+[Desktop Entry]
+Type=Application
+Name=JARVIS
+Comment=JARVIS Voice Assistant
+Exec=bash -c 'sleep 5 && python3 /home/$USER/jarvis.py'
+Icon=utilities-terminal
+Terminal=false
+X-GNOME-Autostart-enabled=true
+DESKTOP
+        ok "GNOME autostart configured."
+        ;;
+    3)
+        mkdir -p ~/.config/systemd/user
+        cat > ~/.config/systemd/user/jarvis.service << SERVICE
+[Unit]
+Description=JARVIS Voice Assistant
+After=graphical-session.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/$USER/jarvis.py
+Restart=on-failure
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
+
+[Install]
+WantedBy=default.target
+SERVICE
+        systemctl --user daemon-reload
+        systemctl --user enable jarvis.service
+        ok "systemd service configured and enabled."
+        ;;
+    *)
+        info "Skipping autostart. Run manually with: python3 ~/jarvis.py"
+        ;;
+esac
+
+# ── IPv6 fix ──────────────────────────────────────────────────────────────────
+echo ""
+echo -e "  ${BOLD}Step 8 — Network optimization${NC}"
+ask "Disable IPv6? (fixes Gemini API timeouts on some networks) [y/N]:" IPV6_CHOICE
+if [[ "$IPV6_CHOICE" =~ ^[Yy]$ ]]; then
+    echo "net.ipv6.conf.all.disable_ipv6 = 1" | sudo tee -a /etc/sysctl.conf &>/dev/null
+    sudo sysctl -p &>/dev/null
+    ok "IPv6 disabled."
 else
-    info "Skipping autostart. Run manually with: python3 ~/jarvis.py"
+    info "Skipping IPv6 fix."
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo -e "  ${BLUE}────────────────────────────────────────${NC}"
+echo -e "  ${BLUE}──────────────────────────────────────────${NC}"
 echo -e "  ${GREEN}${BOLD}Installation complete!${NC}"
 echo ""
 echo -e "  Run JARVIS with:"
 echo -e "  ${CYAN}python3 ~/jarvis.py${NC}"
 echo ""
-echo -e "  Say ${BOLD}\"JARVIS, what is my RAM usage\"${NC} to test."
-echo -e "  ${BLUE}────────────────────────────────────────${NC}"
+echo -e "  Try saying: ${BOLD}\"JARVIS, check system health\"${NC}"
+echo -e "  ${BLUE}──────────────────────────────────────────${NC}"
 echo ""
