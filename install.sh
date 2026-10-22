@@ -84,6 +84,19 @@ if ! sudo -v &>/dev/null; then
     fail "This installer requires sudo privileges."
 fi
 
+# ── Check Python version ──────────────────────────────────────────────────────
+PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)
+PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+
+if [[ -z "$PYTHON_VERSION" ]]; then
+    fail "Python 3 not found. Please install Python 3.8 or newer."
+elif [[ "$PYTHON_MAJOR" -lt 3 || ( "$PYTHON_MAJOR" -eq 3 && "$PYTHON_MINOR" -lt 8 ) ]]; then
+    fail "Python $PYTHON_VERSION detected. JARVIS requires Python 3.8 or newer."
+else
+    ok "Python $PYTHON_VERSION detected."
+fi
+
 # ── Gemini API key ────────────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Step 1 — Gemini API Key${NC}"
@@ -265,7 +278,7 @@ ExecStart=/usr/bin/python3 /home/$USER/jarvis.py
 Restart=on-failure
 RestartSec=5
 Environment=DISPLAY=:0
-Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
+Environment=PULSE_RUNTIME_PATH=/run/user/$(id -u)/pulse
 
 [Install]
 WantedBy=default.target
