@@ -20,7 +20,34 @@
 ![License](https://img.shields.io/badge/License-MIT-purple)
 
 </div>
----
+
+
+
+
+<div align="center">
+
+```text
+     ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
+     ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
+     ██║███████║██████╔╝██║   ██║██║███████╗
+     A JARVIS-style offline voice assistant for Linux
+██   ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
+╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║
+ ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝
+```
+
+![Linux](https://img.shields.io/badge/Linux-Universal-blue?logo=linux)
+![Python](https://img.shields.io/badge/Python-3.8+-green?logo=python)
+![Gemini](https://img.shields.io/badge/AI-Google%20Gemini-orange?logo=google)
+![License](https://img.shields.io/badge/License-MIT-purple)
+
+</div>
+
+
+
+
+
+  ---
 
 ## What is this?
 
