@@ -5,15 +5,14 @@
 
 
 <div align="center">
-<pre>
      ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
      ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
      ██║███████║██████╔╝██║   ██║██║███████╗
-     A JARVIS-style offline voice assistant for Linux
 ██   ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
 ╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║
  ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝
-</pre>
+
+**A JARVIS-style offline voice assistant for Linux**
 
 ![Linux](https://img.shields.io/badge/Linux-Universal-blue?logo=linux)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?logo=python)
