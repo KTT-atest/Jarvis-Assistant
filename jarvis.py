@@ -280,6 +280,7 @@ def callback(indata, frames, time, status):
         q.put(bytes(indata))
 
 init_piper()
+init_piper()
 print("J.A.R.V.I.S. online.")
 speak("All systems online. How can I assist you, sir?")
 
