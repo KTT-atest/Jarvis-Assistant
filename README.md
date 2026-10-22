@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. Voice Assistant
 
-A JARVIS-style voice assistant for Fedora KDE Linux.
+A JARVIS-style voice assistant for Linux.
 
 ## Features
 - Wake word detection ("JARVIS")
