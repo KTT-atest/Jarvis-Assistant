@@ -9,10 +9,11 @@ socket.getaddrinfo = _ipv4_only
 
 from vosk import Model, KaldiRecognizer
 
-WAKE_WORDS     = ["jarvis", "jonas", "davis", "travis", "dumbass", "friday", "journalists"]
+WAKE_WORDS     = ["jarvis", "jonas", "davis", "travis", "friday"]
 MODEL_PATH     = os.path.expanduser("~/vosk-model/vosk-model-small-en-us-0.15")
 PIPER_MODEL    = os.path.expanduser("~/piper-voices/jarvis-high.onnx")
-GEMINI_API_KEY = "YOUR_KEY_HERE"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_KEY_HERE")
+GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 model = Model(MODEL_PATH)
 rec   = KaldiRecognizer(model, 16000)
@@ -166,7 +167,7 @@ def ask_gemini(prompt):
 
     try:
         response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={GEMINI_API_KEY}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}",
             json={
                 "contents": messages,
                 "generationConfig": {"maxOutputTokens": 200},
