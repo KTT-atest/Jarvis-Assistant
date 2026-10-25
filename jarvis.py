@@ -123,32 +123,20 @@ def init_piper():
     print("Piper ready.")
 
 def speak(text):
-    global is_speaking, piper_proc
+    global is_speaking
     is_speaking = True
     print(f"JARVIS: {text}")
     text = text.replace('"', '').replace("'", '').replace('`', '').strip()
+    tmp = "/tmp/jarvis_tts.wav"
     q.queue.clear()
-    try:
-        piper_proc.stdin.write((text + '\n').encode())
-        piper_proc.stdin.flush()
-        aplay = subprocess.Popen(
-            ['aplay', '-r', '22050', '-f', 'S16_LE', '-t', 'raw', '-q', '-'],
-            stdin=subprocess.PIPE
-        )
-        import time
-        start = time.time()
-        while True:
-            chunk = piper_proc.stdout.read(4096)
-            if not chunk:
-                break
-            aplay.stdin.write(chunk)
-            if time.time() - start > 15:
-                break
-        aplay.stdin.close()
-        aplay.wait()
-    except Exception as e:
-        print(f"Speak error: {e}")
-        init_piper()
+    subprocess.run(
+        f'echo "{text}" | piper --model {PIPER_MODEL} --output_file {tmp}',
+        shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    subprocess.run(
+        f'aplay {tmp}',
+        shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
     q.queue.clear()
     is_speaking = False
 
@@ -279,12 +267,14 @@ def callback(indata, frames, time, status):
     if not is_speaking:
         q.put(bytes(indata))
 
-init_piper()
+
 print("J.A.R.V.I.S. online.")
 speak("All systems online. How can I assist you, sir?")
 
+
 with sd.RawInputStream(samplerate=16000, blocksize=8000,
-                        dtype="int16", channels=1, callback=callback):
+                        dtype="int16", channels=1, callback=callback,
+                        device='pipewire', latency='high'):
     while True:
         data = q.get()
         if rec.AcceptWaveform(data):
